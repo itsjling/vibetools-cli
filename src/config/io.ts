@@ -107,6 +107,7 @@ function coerceConfig(value: unknown): VibetoolsConfig {
         defaults.agents["claude-code"]
       ),
       codex: coerceAgentConfig(agentsObj?.codex, defaults.agents.codex),
+      cursor: coerceAgentConfig(agentsObj?.cursor, defaults.agents.cursor),
       opencode: coerceAgentConfig(
         agentsObj?.opencode,
         defaults.agents.opencode
