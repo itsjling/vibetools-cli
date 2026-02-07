@@ -239,6 +239,35 @@ describe("vibetools", () => {
     ).resolves.toContain("baz");
   });
 
+  it("collect does not import local-only entries without --import-extras", async () => {
+    const repoPath = path.join(tempHome, "repo");
+    await runInit({ repo: repoPath });
+
+    const agentSkills = path.join(tempHome, "agent", "skills");
+    const agentCommands = path.join(tempHome, "agent", "commands");
+    await fs.mkdir(agentSkills, { recursive: true });
+    await fs.mkdir(agentCommands, { recursive: true });
+    await writeFile(path.join(agentSkills, "local", "SKILL.md"), "local\n");
+
+    const { config, configPath } = await loadConfig();
+    config.repoPath = repoPath;
+    config.agents.codex.enabled = true;
+    config.agents.codex.paths.skills = agentSkills;
+    config.agents.codex.paths.commands = agentCommands;
+    await saveConfig(config, configPath);
+
+    await runCollect({
+      agent: "codex",
+      importExtras: false,
+      policy: "localWins",
+      type: "skills",
+    });
+
+    await expect(
+      fs.lstat(path.join(repoAgentsSkillsDir(repoPath), "local"))
+    ).rejects.toBeTruthy();
+  });
+
   it("status reports broken symlinks", async () => {
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });

@@ -103,6 +103,9 @@ async function decideConflict(args: {
       type: "select",
     });
 
+    if (!res.decision) {
+      return "abort";
+    }
     if (res.decision === "diff") {
       const patch = await diffFiles(args.src, args.dest);
       console.log(patch);

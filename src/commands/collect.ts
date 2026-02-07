@@ -87,6 +87,11 @@ async function decideRepoConflict(args: {
       name: "decision",
       type: "select",
     });
+    if (!res.decision) {
+      throw new VibetoolsError("Aborted due to unresolved conflicts.", {
+        exitCode: EXIT_ABORT,
+      });
+    }
     if (res.decision === "abort") {
       throw new VibetoolsError("Aborted due to unresolved conflicts.", {
         exitCode: EXIT_ABORT,
@@ -215,8 +220,14 @@ async function handleRepoMissing(args: {
   force: boolean;
   importExtras: boolean;
 }): Promise<"skip" | "proceed"> {
-  if (!args.importExtras && args.policy === "repoWins") {
-    return "skip";
+  if (!args.importExtras) {
+    if (args.policy === "repoWins") {
+      return "skip";
+    }
+    if (args.policy === "localWins") {
+      // Local-only entries are not auto-imported without --import-extras.
+      return "skip";
+    }
   }
   if (!args.importExtras && args.policy === "prompt") {
     const decision = await decideRepoConflict({
