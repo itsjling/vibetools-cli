@@ -31,10 +31,21 @@ function defaultCodexPaths() {
   };
 }
 
+function defaultCursorPaths() {
+  const base = path.join(os.homedir(), ".cursor");
+  return {
+    commands: path.join(base, "commands"),
+    skills: path.join(base, "skills"),
+  };
+}
+
 export function createDefaultConfig(): VibetoolsConfig {
   const codex = defaultAgentConfig();
   codex.enabled = true;
   codex.paths = defaultCodexPaths();
+
+  const cursor = defaultAgentConfig();
+  cursor.paths = defaultCursorPaths();
 
   const claude = defaultAgentConfig();
   const opencode = defaultAgentConfig();
@@ -43,6 +54,7 @@ export function createDefaultConfig(): VibetoolsConfig {
     agents: {
       "claude-code": claude,
       codex,
+      cursor,
       opencode,
     },
     backups: { dir: getDefaultBackupsPath(), enabled: true },

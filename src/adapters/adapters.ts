@@ -15,6 +15,12 @@ export const adapters: AgentAdapter[] = [
     id: "codex",
   },
   {
+    defaultCommandsPath: () => home(".cursor", "commands"),
+    defaultSkillsPath: () => home(".cursor", "skills"),
+    displayName: "Cursor",
+    id: "cursor",
+  },
+  {
     defaultCommandsPath: () => null,
     defaultSkillsPath: () => null,
     displayName: "Claude Code",

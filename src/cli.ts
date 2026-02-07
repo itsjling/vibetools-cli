@@ -37,7 +37,7 @@ program
   .option("--remote", "Fetch and show git ahead/behind (if remote configured)")
   .option(
     "--agent <id>",
-    "Filter to a single agent (codex|claude-code|opencode)"
+    "Filter to a single agent (codex|claude-code|cursor|opencode)"
   )
   .option("--type <type>", "Filter to a single type (skills|commands)")
   .action(async (opts) => runStatus(opts));
@@ -50,7 +50,7 @@ program
   .option("--dry-run", "Print planned operations without writing")
   .option(
     "--agent <id>",
-    "Filter to a single agent (codex|claude-code|opencode)"
+    "Filter to a single agent (codex|claude-code|cursor|opencode)"
   )
   .option("--type <type>", "Filter to a single type (skills|commands)")
   .option("--policy <policy>", "Conflict policy (prompt|repoWins|localWins)")
@@ -64,7 +64,7 @@ program
   .option("--dry-run", "Print planned operations without writing")
   .option(
     "--agent <id>",
-    "Filter to a single agent (codex|claude-code|opencode)"
+    "Filter to a single agent (codex|claude-code|cursor|opencode)"
   )
   .option("--type <type>", "Filter to a single type (skills|commands)")
   .option("--policy <policy>", "Conflict policy (prompt|repoWins|localWins)")

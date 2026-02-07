@@ -11,10 +11,11 @@ export const VIBETOOLS_ARTIFACT_TYPES: readonly VibetoolsArtifactType[] = [
   "commands",
 ] as const;
 
-export type AgentId = "codex" | "claude-code" | "opencode";
+export type AgentId = "codex" | "claude-code" | "cursor" | "opencode";
 export const AGENT_IDS: readonly AgentId[] = [
   "codex",
   "claude-code",
+  "cursor",
   "opencode",
 ] as const;
 
