@@ -55,13 +55,20 @@ export async function copyEntry(src: string, dest: string): Promise<void> {
 
 export async function copyEntryDereference(
   src: string,
-  dest: string
+  dest: string,
+  seen: Set<string> = new Set()
 ): Promise<void> {
   const stat = await fs.lstat(src);
   await ensureDir(path.dirname(dest));
+
+  const resolved = await fs.realpath(src);
+  if (seen.has(resolved)) {
+    return;
+  }
+  seen.add(resolved);
+
   if (stat.isSymbolicLink()) {
-    const resolved = await fs.realpath(src);
-    await copyEntryDereference(resolved, dest);
+    await copyEntryDereference(resolved, dest, seen);
     return;
   }
   if (stat.isDirectory()) {
@@ -73,7 +80,8 @@ export async function copyEntryDereference(
       }
       await copyEntryDereference(
         path.join(src, child.name),
-        path.join(dest, child.name)
+        path.join(dest, child.name),
+        seen
       );
     }
     return;
