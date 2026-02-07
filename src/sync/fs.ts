@@ -53,6 +53,34 @@ export async function copyEntry(src: string, dest: string): Promise<void> {
   await fs.copyFile(src, dest);
 }
 
+export async function copyEntryDereference(
+  src: string,
+  dest: string
+): Promise<void> {
+  const stat = await fs.lstat(src);
+  await ensureDir(path.dirname(dest));
+  if (stat.isSymbolicLink()) {
+    const resolved = await fs.realpath(src);
+    await copyEntryDereference(resolved, dest);
+    return;
+  }
+  if (stat.isDirectory()) {
+    await fs.mkdir(dest, { recursive: true });
+    const children = await fs.readdir(src, { withFileTypes: true });
+    for (const child of children) {
+      if (DEFAULT_IGNORE_BASENAMES.has(child.name)) {
+        continue;
+      }
+      await copyEntryDereference(
+        path.join(src, child.name),
+        path.join(dest, child.name)
+      );
+    }
+    return;
+  }
+  await fs.copyFile(src, dest);
+}
+
 export async function backupEntry(
   srcExisting: string,
   backupDest: string

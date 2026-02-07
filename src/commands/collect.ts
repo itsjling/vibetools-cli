@@ -1,19 +1,16 @@
 import chalk from "chalk";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import prompts from "prompts";
 
-import type {
-  AgentId,
-  ConflictPolicy,
-  VibetoolsArtifactType,
-} from "../config/types.js";
+import type { ConflictPolicy, VibetoolsArtifactType } from "../config/types.js";
 
 import { diffFiles } from "../sync/diff.js";
 import { applyFilters } from "../sync/filters.js";
 import {
   backupEntry,
-  copyEntry,
+  copyEntryDereference,
   ensureDir,
   listTopLevelEntries,
   pathExists,
@@ -44,9 +41,11 @@ interface CollectOptions {
 type ConflictDecision = "import" | "skip";
 
 const EXIT_ABORT = 2;
+const SHARED_LABEL = "shared";
+const SHARED_FILTERS = { exclude: [] as string[], include: ["**"] };
 
 async function decideRepoConflict(args: {
-  agentId: AgentId;
+  sourceLabel: string;
   type: VibetoolsArtifactType;
   name: string;
   local: string;
@@ -82,7 +81,7 @@ async function decideRepoConflict(args: {
         { title: "Abort", value: "abort" },
       ],
       message: args.isExtra
-        ? `Local-only: ${args.agentId} ${args.type} '${args.name}'. Import into repo?`
+        ? `Local-only: ${args.sourceLabel} ${args.type} '${args.name}'. Import into repo?`
         : `Conflict: repo already has '${args.name}'. Import local over repo?`,
       name: "decision",
       type: "select",
@@ -138,7 +137,7 @@ async function maybeBackupAndRemoveRepo(args: {
   repoPath: string;
   backupDir: string;
   timestamp: string;
-  agentId: AgentId;
+  sourceLabel: string;
   type: VibetoolsArtifactType;
   name: string;
   dryRun: boolean;
@@ -150,7 +149,7 @@ async function maybeBackupAndRemoveRepo(args: {
   const backupDest = path.join(
     args.backupDir,
     args.timestamp,
-    args.agentId,
+    args.sourceLabel,
     args.type,
     args.name
   );
@@ -161,7 +160,7 @@ async function maybeBackupAndRemoveRepo(args: {
 async function handleRepoExists(args: {
   repo: string;
   local: string;
-  agentId: AgentId;
+  sourceLabel: string;
   type: VibetoolsArtifactType;
   name: string;
   policy: ConflictPolicy;
@@ -179,7 +178,7 @@ async function handleRepoExists(args: {
   }
   if (args.policy === "prompt") {
     const decision = await decideRepoConflict({
-      agentId: args.agentId,
+      sourceLabel: args.sourceLabel,
       force: args.force,
       isExtra: false,
       local: args.local,
@@ -193,13 +192,13 @@ async function handleRepoExists(args: {
   }
 
   await maybeBackupAndRemoveRepo({
-    agentId: args.agentId,
     backupDir: args.backupsDir,
     backupsEnabled: args.backupsEnabled,
     dryRun: args.dryRun,
     name: args.name,
     repoPath: args.repo,
     timestamp: args.timestamp,
+    sourceLabel: args.sourceLabel,
     type: args.type,
   });
 
@@ -213,7 +212,7 @@ async function handleRepoExists(args: {
 async function handleRepoMissing(args: {
   repo: string;
   local: string;
-  agentId: AgentId;
+  sourceLabel: string;
   type: VibetoolsArtifactType;
   name: string;
   policy: ConflictPolicy;
@@ -231,7 +230,7 @@ async function handleRepoMissing(args: {
   }
   if (!args.importExtras && args.policy === "prompt") {
     const decision = await decideRepoConflict({
-      agentId: args.agentId,
+      sourceLabel: args.sourceLabel,
       force: args.force,
       isExtra: true,
       local: args.local,
@@ -249,7 +248,7 @@ async function handleRepoMissing(args: {
 async function collectEntry(args: {
   repoRoot: string;
   localRoot: string;
-  agentId: AgentId;
+  sourceLabel: string;
   type: VibetoolsArtifactType;
   name: string;
   policy: ConflictPolicy;
@@ -270,7 +269,6 @@ async function collectEntry(args: {
   const repoExists = await pathExists(repo);
   const action = repoExists
     ? await handleRepoExists({
-        agentId: args.agentId,
         backupsDir: args.backupsDir,
         backupsEnabled: args.backupsEnabled,
         dryRun: args.dryRun,
@@ -279,17 +277,18 @@ async function collectEntry(args: {
         name: args.name,
         policy: args.policy,
         repo,
+        sourceLabel: args.sourceLabel,
         timestamp: args.timestamp,
         type: args.type,
       })
     : await handleRepoMissing({
-        agentId: args.agentId,
         force: args.force,
         importExtras: args.importExtras,
         local,
         name: args.name,
         policy: args.policy,
         repo,
+        sourceLabel: args.sourceLabel,
         type: args.type,
       });
   if (action === "skip") {
@@ -298,19 +297,21 @@ async function collectEntry(args: {
 
   if (args.dryRun) {
     console.log(
-      `${args.agentId} ${args.type}: would import ${args.name} into repo`
+      `${args.sourceLabel} ${args.type}: would import ${args.name} into repo`
     );
     return;
   }
 
-  await copyEntry(local, repo);
+  await copyEntryDereference(local, repo);
   console.log(
-    chalk.green(`${args.agentId} ${args.type}: imported ${args.name} into repo`)
+    chalk.green(
+      `${args.sourceLabel} ${args.type}: imported ${args.name} into repo`
+    )
   );
 }
 
 async function collectForAgentType(args: {
-  agentId: AgentId;
+  sourceLabel: string;
   type: VibetoolsArtifactType;
   localRoot: string;
   repoRoot: string;
@@ -330,7 +331,6 @@ async function collectForAgentType(args: {
   );
   for (const name of localEntries) {
     await collectEntry({
-      agentId: args.agentId,
       backupsDir: args.backupsDir,
       backupsEnabled: args.backupsEnabled,
       dryRun: args.dryRun,
@@ -340,6 +340,7 @@ async function collectForAgentType(args: {
       name,
       policy: args.policy,
       repoRoot: args.repoRoot,
+      sourceLabel: args.sourceLabel,
       timestamp: args.timestamp,
       type: args.type,
     });
@@ -368,7 +369,7 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
       }
       const repoRoot = repoTypeDir(config.repoPath, type);
       await collectForAgentType({
-        agentId,
+        sourceLabel: agentId,
         backupsDir: config.backups.dir,
         backupsEnabled: config.backups.enabled,
         dryRun: Boolean(opts.dryRun),
@@ -382,5 +383,25 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
         type,
       });
     }
+  }
+
+  const sharedRoot = path.join(os.homedir(), ".agents");
+  for (const type of types) {
+    const localRoot = path.join(sharedRoot, type);
+    const repoRoot = repoTypeDir(config.repoPath, type);
+    await collectForAgentType({
+      sourceLabel: SHARED_LABEL,
+      backupsDir: config.backups.dir,
+      backupsEnabled: config.backups.enabled,
+      dryRun: Boolean(opts.dryRun),
+      force: Boolean(opts.force),
+      importExtras: Boolean(opts.importExtras),
+      includeFilters: SHARED_FILTERS,
+      localRoot,
+      policy,
+      repoRoot,
+      timestamp,
+      type,
+    });
   }
 }
