@@ -32,7 +32,8 @@ export async function runPull(opts: PullOptions): Promise<void> {
     }
   }
 
-  const args = ["pull", ...(opts.rebase ? ["--rebase"] : [])];
+  const useRebase = opts.rebase !== false;
+  const args = ["pull", ...(useRebase ? ["--rebase"] : ["--no-rebase"])];
   await gitOrThrow(config.repoPath, args, "git pull failed.");
   console.log(chalk.green("Pulled latest changes."));
   await runInstall({ dryRun: opts.dryRun });

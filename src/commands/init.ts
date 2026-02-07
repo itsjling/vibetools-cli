@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import prompts from "prompts";
 
@@ -14,6 +15,7 @@ import {
   repoTemplatesAgentsMdDir,
 } from "../repo/layout.js";
 import { VibetoolsError } from "../util/errors.js";
+import { ensureRepoLooksInitialized } from "./_shared.js";
 
 interface InitOptions {
   repo?: string;
@@ -111,6 +113,36 @@ async function setOriginRemote(
   );
 }
 
+async function confirmReclone(repoPath: string): Promise<boolean> {
+  const res = await prompts<{ ok?: boolean }>(
+    {
+      initial: false,
+      message: `Existing repo found at ${repoPath}. Delete and clone new url?`,
+      name: "ok",
+      type: "confirm",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return Boolean(res.ok);
+}
+
+async function recloneRepo(
+  repoPath: string,
+  remoteUrl: string
+): Promise<void> {
+  if (repoPath === "/" || repoPath === os.homedir()) {
+    throw new VibetoolsError(`Refusing to delete ${repoPath}.`, {
+      exitCode: 1,
+    });
+  }
+  await fs.rm(repoPath, { force: true, recursive: true });
+  await gitOrThrow(
+    path.dirname(repoPath),
+    ["clone", remoteUrl, repoPath],
+    "git clone failed."
+  );
+}
+
 async function setUpstreamConfig(
   repoPath: string,
   branch: string
@@ -197,11 +229,28 @@ export async function runInit(opts: InitOptions): Promise<void> {
   await ensureVibetoolsHome();
 
   const repoPath = path.resolve(opts.repo ?? getDefaultRepoPath());
+  const gitDir = path.join(repoPath, ".git");
 
   const { config, configPath } = await loadConfig();
   const nextConfig = config ?? createDefaultConfig();
   nextConfig.repoPath = repoPath;
   await saveConfig(nextConfig, configPath);
+
+  if (await pathExists(gitDir)) {
+    const choice = await promptRemoteChoice();
+    if (choice === "new") {
+      printNewRemoteInstructions();
+    }
+    const remoteUrl = opts.remote ?? (await promptRemoteUrl());
+    const ok = await confirmReclone(repoPath);
+    if (!ok) {
+      throw new VibetoolsError("Aborted.", { exitCode: 1 });
+    }
+    await recloneRepo(repoPath, remoteUrl);
+    await ensureRepoLooksInitialized(repoPath);
+    console.log(chalk.green(`Re-cloned vibetools repo at ${repoPath}`));
+    return;
+  }
 
   await fs.mkdir(repoAgentsSkillsDir(repoPath), { recursive: true });
   await fs.mkdir(repoAgentsCommandsDir(repoPath), { recursive: true });

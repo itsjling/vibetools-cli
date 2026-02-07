@@ -46,7 +46,7 @@ async function commitIfNeeded(args: {
 }): Promise<void> {
   const porcelain = await getGitStatusPorcelain(args.repoPath);
   if (porcelain.length === EMPTY_LENGTH) {
-    console.log(chalk.dim("No changes to commit."));
+    console.log(chalk.dim("No local changes to commit. Continuing with push."));
     return;
   }
 

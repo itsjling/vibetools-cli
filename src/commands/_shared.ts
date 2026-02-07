@@ -9,7 +9,11 @@ import {
   type VibetoolsArtifactType,
   type VibetoolsConfig,
 } from "../config/types.js";
-import { repoAgentsCommandsDir, repoAgentsSkillsDir } from "../repo/layout.js";
+import {
+  repoAgentsCommandsDir,
+  repoAgentsSkillsDir,
+  repoMetadataPath,
+} from "../repo/layout.js";
 import { pathExists } from "../sync/fs.js";
 import { VibetoolsError } from "../util/errors.js";
 
@@ -60,7 +64,11 @@ export async function ensureRepoLooksInitialized(
 ): Promise<void> {
   const skillsDir = repoAgentsSkillsDir(repoPath);
   const commandsDir = repoAgentsCommandsDir(repoPath);
-  if (!(await pathExists(skillsDir)) || !(await pathExists(commandsDir))) {
+  const metadataPath = repoMetadataPath(repoPath);
+  const hasDirs =
+    (await pathExists(skillsDir)) && (await pathExists(commandsDir));
+  const hasMetadata = await pathExists(metadataPath);
+  if (!hasDirs && !hasMetadata) {
     throw new VibetoolsError(
       `Repo at ${repoPath} does not look initialized. Run 'vibetools init' first.`,
       { exitCode: 1 }

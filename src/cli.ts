@@ -79,7 +79,8 @@ program
 program
   .command("pull")
   .description("git pull then install into enabled agents.")
-  .option("--rebase", "Use git pull --rebase")
+  .option("--rebase", "Use git pull --rebase (default)")
+  .option("--no-rebase", "Use git pull --no-rebase")
   .option("--dry-run", "Plan install without writing")
   .action(async (opts) => runPull(opts));
 
