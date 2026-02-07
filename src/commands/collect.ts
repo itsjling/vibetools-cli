@@ -354,12 +354,26 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
   const agents = parseAgentFilter(opts.agent);
   const types = parseTypeFilter(opts.type);
   const policy = resolvePolicy(opts.policy, config.conflictPolicy);
+  const respectEnabled = !opts.agent;
 
   const timestamp = formatTimestampForPath();
   for (const agentId of agents) {
     const agentCfg = config.agents[agentId];
-    if (!agentCfg.enabled) {
+    if (!agentCfg) {
+      throw new VibetoolsError(
+        `Agent '${agentId}' is not configured. Run 'vibetools configure' to set it up.`,
+        { exitCode: 1 }
+      );
+    }
+    if (respectEnabled && !agentCfg.enabled) {
       continue;
+    }
+    if (!respectEnabled && !agentCfg.enabled) {
+      console.log(
+        chalk.yellow(
+          `${agentId}: agent is disabled in config, but collecting because --agent was specified.`
+        )
+      );
     }
 
     for (const type of types) {
