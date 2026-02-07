@@ -23,6 +23,7 @@ program
   .description("Initialize the vibetools git repo and directory structure.")
   .option("--repo <path>", "Repo path (default: ~/.vibetools/repo)")
   .option("--remote <url>", "Optional git remote URL (origin)")
+  .option("--branch <name>", "Default branch name (default: main)")
   .action(async (opts) => runInit(opts));
 
 program

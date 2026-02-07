@@ -18,12 +18,14 @@ import { VibetoolsError } from "../util/errors.js";
 interface InitOptions {
   repo?: string;
   remote?: string;
+  branch?: string;
 }
 
 type RemoteChoice = "existing" | "new";
 
 const INDEX_FIRST = 0;
 const EMPTY_LENGTH = 0;
+const DEFAULT_BRANCH = "main";
 
 function promptOnCancel(): never {
   throw new VibetoolsError("Aborted.", { exitCode: 1 });
@@ -109,6 +111,28 @@ async function setOriginRemote(
   );
 }
 
+async function setUpstreamConfig(
+  repoPath: string,
+  branch: string
+): Promise<void> {
+  const normalized = branch.trim() || DEFAULT_BRANCH;
+  await gitOrThrow(
+    repoPath,
+    ["branch", "-M", normalized],
+    "Failed to set branch name."
+  );
+  await gitOrThrow(
+    repoPath,
+    ["config", `branch.${normalized}.remote`, "origin"],
+    "Failed to configure branch remote."
+  );
+  await gitOrThrow(
+    repoPath,
+    ["config", `branch.${normalized}.merge`, `refs/heads/${normalized}`],
+    "Failed to configure branch merge target."
+  );
+}
+
 async function promptRemoteChoice(): Promise<RemoteChoice> {
   const selection = await prompts<{ choice?: RemoteChoice }>(
     {
@@ -132,6 +156,26 @@ function printNewRemoteInstructions(): void {
   console.log("1. Create a new remote git repository.");
   console.log("2. Copy its HTTPS or SSH URL.");
   console.log("");
+}
+
+async function promptBranchName(): Promise<string> {
+  const res = await prompts<{ branch?: string }>(
+    {
+      initial: DEFAULT_BRANCH,
+      message: "Default branch name",
+      name: "branch",
+      type: "text",
+      validate: (value: unknown) =>
+        String(value ?? "").trim().length > EMPTY_LENGTH ? true : "Required",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return String(res.branch ?? DEFAULT_BRANCH);
+}
+
+function resolveBranchName(input?: string): string {
+  const trimmed = input?.trim();
+  return trimmed && trimmed.length > EMPTY_LENGTH ? trimmed : DEFAULT_BRANCH;
 }
 
 async function promptRemoteUrl(): Promise<string> {
@@ -173,6 +217,10 @@ export async function runInit(opts: InitOptions): Promise<void> {
 
   if (opts.remote) {
     await setOriginRemote(repoPath, opts.remote);
+    const branch = resolveBranchName(
+      opts.branch ?? (await promptBranchName())
+    );
+    await setUpstreamConfig(repoPath, branch);
   } else {
     const choice = await promptRemoteChoice();
     if (choice === "new") {
@@ -180,6 +228,10 @@ export async function runInit(opts: InitOptions): Promise<void> {
     }
     const remoteUrl = await promptRemoteUrl();
     await setOriginRemote(repoPath, remoteUrl);
+    const branch = resolveBranchName(
+      opts.branch ?? (await promptBranchName())
+    );
+    await setUpstreamConfig(repoPath, branch);
   }
 
   console.log(chalk.green(`Initialized vibetools repo at ${repoPath}`));
