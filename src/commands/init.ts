@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import fs from "node:fs/promises";
 import path from "node:path";
+import prompts from "prompts";
 
 import { createDefaultConfig } from "../config/defaults.js";
 import { ensureVibetoolsHome, loadConfig, saveConfig } from "../config/io.js";
@@ -17,6 +18,15 @@ import { VibetoolsError } from "../util/errors.js";
 interface InitOptions {
   repo?: string;
   remote?: string;
+}
+
+type RemoteChoice = "existing" | "new";
+
+const INDEX_FIRST = 0;
+const EMPTY_LENGTH = 0;
+
+function promptOnCancel(): never {
+  throw new VibetoolsError("Aborted.", { exitCode: 1 });
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -99,6 +109,45 @@ async function setOriginRemote(
   );
 }
 
+async function promptRemoteChoice(): Promise<RemoteChoice> {
+  const selection = await prompts<{ choice?: RemoteChoice }>(
+    {
+      choices: [
+        { title: "New repository", value: "new" },
+        { title: "Existing repository", value: "existing" },
+      ],
+      initial: INDEX_FIRST,
+      message: "How do you want to setup?",
+      name: "choice",
+      type: "select",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return selection.choice ?? "new";
+}
+
+function printNewRemoteInstructions(): void {
+  console.log("");
+  console.log(chalk.cyan("Setup instructions"));
+  console.log("1. Create a new remote git repository.");
+  console.log("2. Copy its HTTPS or SSH URL.");
+  console.log("");
+}
+
+async function promptRemoteUrl(): Promise<string> {
+  const res = await prompts<{ remote?: string }>(
+    {
+      message: "Paste the remote URL",
+      name: "remote",
+      type: "text",
+      validate: (value: unknown) =>
+        String(value ?? "").trim().length > EMPTY_LENGTH ? true : "Required",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return String(res.remote ?? "");
+}
+
 export async function runInit(opts: InitOptions): Promise<void> {
   await ensureGitAvailable();
   await ensureVibetoolsHome();
@@ -124,6 +173,13 @@ export async function runInit(opts: InitOptions): Promise<void> {
 
   if (opts.remote) {
     await setOriginRemote(repoPath, opts.remote);
+  } else {
+    const choice = await promptRemoteChoice();
+    if (choice === "new") {
+      printNewRemoteInstructions();
+    }
+    const remoteUrl = await promptRemoteUrl();
+    await setOriginRemote(repoPath, remoteUrl);
   }
 
   console.log(chalk.green(`Initialized vibetools repo at ${repoPath}`));

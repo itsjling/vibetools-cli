@@ -5,7 +5,7 @@
   "description": "CLI for managing AI agent skills/commands via a git-backed vibetools repo.",
   "license": "UNLICENSED",
   "bin": {
-    "vibetools": "dist/cli.js"
+    "vibetools": "dist/cli.mjs"
   },
   "type": "module",
   "scripts": {
