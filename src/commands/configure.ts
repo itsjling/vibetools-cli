@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import prompts from "prompts";
 
@@ -19,6 +20,16 @@ const INDEX_FIRST = 0;
 const INDEX_SECOND = 1;
 const INDEX_THIRD = 2;
 const EMPTY_LENGTH = 0;
+
+function expandUserPath(input: string): string {
+  if (input === "~") {
+    return os.homedir();
+  }
+  if (input.startsWith("~/")) {
+    return path.join(os.homedir(), input.slice(2));
+  }
+  return input;
+}
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -238,8 +249,8 @@ async function configureAgent(
     defaults,
   });
 
-  const skillsPath = path.resolve(String(res.skills));
-  const commandsPath = path.resolve(String(res.commands));
+  const skillsPath = path.resolve(expandUserPath(String(res.skills)));
+  const commandsPath = path.resolve(expandUserPath(String(res.commands)));
 
   await ensureDirInteractive(skillsPath);
   await ensureDirInteractive(commandsPath);
