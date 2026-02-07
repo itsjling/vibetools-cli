@@ -87,6 +87,8 @@ program
   .description("Collect, commit (if needed), then git push.")
   .option("--message <msg>", "Commit message override")
   .option("--dry-run", "Collect and plan git actions without writing")
+  .option("--collect", "Collect before push (default)")
+  .option("--no-collect", "Skip collect before push")
   .action(async (opts) => runPush(opts));
 
 program

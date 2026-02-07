@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import prompts from "prompts";
 
 import {
   ensureGitAvailable,
@@ -8,16 +9,36 @@ import {
   hasOriginRemote,
 } from "../git/git.js";
 import { formatTimestampForCommit } from "../util/time.js";
+import { VibetoolsError } from "../util/errors.js";
 import { ensureRepoLooksInitialized, loadConfigOrThrow } from "./_shared.js";
 import { runCollect } from "./collect.js";
 
 interface PushOptions {
   message?: string;
   dryRun?: boolean;
+  collect?: boolean;
 }
 
 const EMPTY_LENGTH = 0;
 const EXIT_SUCCESS = 0;
+const INDEX_FIRST = 0;
+
+function promptOnCancel(): never {
+  throw new VibetoolsError("Aborted.", { exitCode: 1 });
+}
+
+async function promptCollect(): Promise<boolean> {
+  const res = await prompts<{ collect?: boolean }>(
+    {
+      initial: INDEX_FIRST,
+      message: "Collect latest agent changes before push?",
+      name: "collect",
+      type: "confirm",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return Boolean(res.collect);
+}
 
 async function commitIfNeeded(args: {
   repoPath: string;
@@ -60,7 +81,11 @@ export async function runPush(opts: PushOptions): Promise<void> {
   await ensureRepoLooksInitialized(config.repoPath);
   await ensureGitAvailable();
 
-  await runCollect({ dryRun: opts.dryRun });
+  const shouldCollect =
+    typeof opts.collect === "boolean" ? opts.collect : await promptCollect();
+  if (shouldCollect) {
+    await runCollect({ dryRun: opts.dryRun });
+  }
   if (opts.dryRun) {
     console.log(chalk.yellow("Dry run: skipping git add/commit/push."));
     return;
