@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": null,
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "pedantic": "off",
+    "style": "warn",
+    "restriction": "warn",
+    "nursery": "warn"
+  },
+  "rules": {
+    "consistent-type-definitions": "off",
+    "explicit-function-return-type": "off",
+    "func-style": "off",
+    "id-length": "off",
+    "max-statements": [
+      "warn",
+      {
+        "max": 20
+      }
+    ],
+    "no-magic-numbers": [
+      "warn",
+      {
+        "ignore": [0, 1, 2, 3, 8000],
+        "ignoreArrayIndexes": true
+      }
+    ],
+    "no-async-await": "off",
+    "no-await-in-loop": "off",
+    "no-console": "off",
+    "no-continue": "off",
+    "no-null": "off",
+    "no-optional-chaining": "off",
+    "no-process-exit": "off",
+    "no-ternary": "off",
+    "no-undefined": "off",
+    "sort-imports": "off"
+  },
+  "settings": {
+    "jsx-a11y": {
+      "polymorphicPropName": null,
+      "components": {},
+      "attributes": {}
+    },
+    "next": {
+      "rootDir": []
+    },
+    "react": {
+      "formComponents": [],
+      "linkComponents": [],
+      "version": null,
+      "componentWrapperFunctions": []
+    },
+    "jsdoc": {
+      "ignorePrivate": false,
+      "ignoreInternal": false,
+      "ignoreReplacesDocs": true,
+      "overrideReplacesDocs": true,
+      "augmentsExtendsReplacesDocs": false,
+      "implementsReplacesDocs": false,
+      "exemptDestructuredRootsFromChecks": false,
+      "tagNamePreference": {}
+    },
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "env": {
+    "builtin": true,
+    "node": true
+  },
+  "globals": {},
+  "ignorePatterns": []
+}
