@@ -26,6 +26,13 @@ afterEach(async () => {
 
 describe("prompt abort handling", () => {
   it("install aborts when conflict prompt is cancelled", async () => {
+    // Set up mock responses BEFORE importing and calling runInit
+    // runInit needs: promptRemoteChoice (choice: "new"), promptRemoteUrl, promptBranchName
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const { runInit } = await import("../src/commands/init.js");
     const { runInstall } = await import("../src/commands/install.js");
 
@@ -58,6 +65,14 @@ describe("prompt abort handling", () => {
   });
 
   it("collect aborts when conflict prompt is cancelled", async () => {
+    // Set up mock responses BEFORE importing and calling runInit
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" })
+      .mockResolvedValueOnce({ selected: ["local"] })
+      .mockResolvedValueOnce({});
+
     const { runInit } = await import("../src/commands/init.js");
     const { runCollect } = await import("../src/commands/collect.js");
 
@@ -76,10 +91,6 @@ describe("prompt abort handling", () => {
     config.agents.codex.paths.skills = agentSkills;
     config.agents.codex.paths.commands = agentCommands;
     await saveConfig(config, configPath);
-
-    promptsMock
-      .mockResolvedValueOnce({ selected: ["local"] })
-      .mockResolvedValueOnce({});
 
     await expect(
       runCollect({

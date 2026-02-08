@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import prompts from "prompts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runCollect } from "../src/commands/collect.js";
@@ -10,6 +11,10 @@ import { loadConfig, saveConfig } from "../src/config/io.js";
 import { repoAgentsSkillsDir } from "../src/repo/layout.js";
 import { createSymlink, sameRealpath } from "../src/sync/symlink.js";
 import { makeTempDir, rmTempDir, writeFile } from "./helpers.js";
+
+vi.mock("prompts", () => ({ default: vi.fn() }));
+
+const promptsMock = vi.mocked(prompts);
 
 let tempHome = "";
 
@@ -95,6 +100,7 @@ async function enableCodexInConfig(args: {
 beforeEach(async () => {
   tempHome = await makeTempDir();
   process.env.VIBETOOLS_HOME = tempHome;
+  promptsMock.mockReset();
 });
 
 afterEach(async () => {
@@ -104,6 +110,11 @@ afterEach(async () => {
 
 describe("vibetools", () => {
   it("init creates minimal repo layout", async () => {
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });
 
@@ -123,6 +134,11 @@ describe("vibetools", () => {
   });
 
   it("install creates per-item symlink by default", async () => {
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });
 
@@ -158,6 +174,11 @@ describe("vibetools", () => {
   });
 
   it("install respects include filters", async () => {
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });
 
@@ -196,6 +217,11 @@ describe("vibetools", () => {
   });
 
   it("collect skips repo-pointing symlinks and can import extras", async () => {
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });
 
@@ -241,6 +267,11 @@ describe("vibetools", () => {
   });
 
   it("collect does not import local-only entries without --import-extras", async () => {
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });
 
@@ -271,6 +302,11 @@ describe("vibetools", () => {
   });
 
   it("status reports broken symlinks", async () => {
+    promptsMock
+      .mockResolvedValueOnce({ choice: "new" })
+      .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })
+      .mockResolvedValueOnce({ branch: "main" });
+
     const repoPath = path.join(tempHome, "repo");
     await runInit({ repo: repoPath });
 
