@@ -74,6 +74,7 @@ program
     "Import local-only entries into the repo without prompting"
   )
   .option("--force", "Do not confirm per conflict (still backs up)")
+  .option("--select-all", "Select all skills/commands without prompting")
   .action(async (opts) => runCollect(opts));
 
 program

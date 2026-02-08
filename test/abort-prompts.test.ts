@@ -77,7 +77,9 @@ describe("prompt abort handling", () => {
     config.agents.codex.paths.commands = agentCommands;
     await saveConfig(config, configPath);
 
-    promptsMock.mockResolvedValueOnce({});
+    promptsMock
+      .mockResolvedValueOnce({ selected: ["local"] })
+      .mockResolvedValueOnce({});
 
     await expect(
       runCollect({

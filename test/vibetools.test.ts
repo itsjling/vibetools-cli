@@ -228,6 +228,7 @@ describe("vibetools", () => {
       agent: "codex",
       importExtras: true,
       policy: "localWins",
+      selectAll: true,
       type: "skills",
     });
 
@@ -260,6 +261,7 @@ describe("vibetools", () => {
       agent: "codex",
       importExtras: false,
       policy: "localWins",
+      selectAll: true,
       type: "skills",
     });
 

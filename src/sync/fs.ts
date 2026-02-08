@@ -56,7 +56,7 @@ export async function copyEntry(src: string, dest: string): Promise<void> {
 export async function copyEntryDereference(
   src: string,
   dest: string,
-  seen: Set<string> = new Set()
+  seen = new Set<string>()
 ): Promise<void> {
   const stat = await fs.lstat(src);
   await ensureDir(path.dirname(dest));

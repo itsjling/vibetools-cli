@@ -126,10 +126,7 @@ async function confirmReclone(repoPath: string): Promise<boolean> {
   return Boolean(res.ok);
 }
 
-async function recloneRepo(
-  repoPath: string,
-  remoteUrl: string
-): Promise<void> {
+async function recloneRepo(repoPath: string, remoteUrl: string): Promise<void> {
   if (repoPath === "/" || repoPath === os.homedir()) {
     throw new VibetoolsError(`Refusing to delete ${repoPath}.`, {
       exitCode: 1,
@@ -266,9 +263,7 @@ export async function runInit(opts: InitOptions): Promise<void> {
 
   if (opts.remote) {
     await setOriginRemote(repoPath, opts.remote);
-    const branch = resolveBranchName(
-      opts.branch ?? (await promptBranchName())
-    );
+    const branch = resolveBranchName(opts.branch ?? (await promptBranchName()));
     await setUpstreamConfig(repoPath, branch);
   } else {
     const choice = await promptRemoteChoice();
@@ -277,9 +272,7 @@ export async function runInit(opts: InitOptions): Promise<void> {
     }
     const remoteUrl = await promptRemoteUrl();
     await setOriginRemote(repoPath, remoteUrl);
-    const branch = resolveBranchName(
-      opts.branch ?? (await promptBranchName())
-    );
+    const branch = resolveBranchName(opts.branch ?? (await promptBranchName()));
     await setUpstreamConfig(repoPath, branch);
   }
 

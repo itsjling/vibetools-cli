@@ -36,6 +36,7 @@ interface CollectOptions {
   policy?: string;
   importExtras?: boolean;
   force?: boolean;
+  selectAll?: boolean;
 }
 
 type ConflictDecision = "import" | "skip";
@@ -178,12 +179,12 @@ async function handleRepoExists(args: {
   }
   if (args.policy === "prompt") {
     const decision = await decideRepoConflict({
-      sourceLabel: args.sourceLabel,
       force: args.force,
       isExtra: false,
       local: args.local,
       name: args.name,
       repo: args.repo,
+      sourceLabel: args.sourceLabel,
       type: args.type,
     });
     if (decision === "skip") {
@@ -197,8 +198,8 @@ async function handleRepoExists(args: {
     dryRun: args.dryRun,
     name: args.name,
     repoPath: args.repo,
-    timestamp: args.timestamp,
     sourceLabel: args.sourceLabel,
+    timestamp: args.timestamp,
     type: args.type,
   });
 
@@ -230,12 +231,12 @@ async function handleRepoMissing(args: {
   }
   if (!args.importExtras && args.policy === "prompt") {
     const decision = await decideRepoConflict({
-      sourceLabel: args.sourceLabel,
       force: args.force,
       isExtra: true,
       local: args.local,
       name: args.name,
       repo: args.repo,
+      sourceLabel: args.sourceLabel,
       type: args.type,
     });
     if (decision === "skip") {
@@ -310,6 +311,35 @@ async function collectEntry(args: {
   );
 }
 
+async function promptForEntries(
+  entries: string[],
+  sourceLabel: string,
+  type: VibetoolsArtifactType,
+  selectAll: boolean
+): Promise<string[]> {
+  if (entries.length === 0) {
+    return [];
+  }
+
+  if (selectAll) {
+    return entries;
+  }
+
+  const res = await prompts<{ selected: string[] }>({
+    choices: entries.map((name) => ({
+      selected: true,
+      title: name,
+      value: name,
+    })),
+    hint: "- Space to toggle, A to toggle all, Enter to confirm",
+    message: `Select ${sourceLabel} ${type} to collect`,
+    name: "selected",
+    type: "multiselect",
+  });
+
+  return res.selected ?? [];
+}
+
 async function collectForAgentType(args: {
   sourceLabel: string;
   type: VibetoolsArtifactType;
@@ -323,13 +353,26 @@ async function collectForAgentType(args: {
   backupsEnabled: boolean;
   backupsDir: string;
   timestamp: string;
+  selectAll: boolean;
 }): Promise<void> {
   await ensureDir(args.repoRoot);
   const localEntries = applyFilters(
     await listTopLevelEntries(args.localRoot),
     args.includeFilters
   );
-  for (const name of localEntries) {
+
+  if (localEntries.length === 0) {
+    return;
+  }
+
+  const selectedEntries = await promptForEntries(
+    localEntries,
+    args.sourceLabel,
+    args.type,
+    args.selectAll
+  );
+
+  for (const name of selectedEntries) {
     await collectEntry({
       backupsDir: args.backupsDir,
       backupsEnabled: args.backupsEnabled,
@@ -383,7 +426,6 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
       }
       const repoRoot = repoTypeDir(config.repoPath, type);
       await collectForAgentType({
-        sourceLabel: agentId,
         backupsDir: config.backups.dir,
         backupsEnabled: config.backups.enabled,
         dryRun: Boolean(opts.dryRun),
@@ -393,6 +435,8 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
         localRoot,
         policy,
         repoRoot,
+        selectAll: Boolean(opts.selectAll),
+        sourceLabel: agentId,
         timestamp,
         type,
       });
@@ -404,7 +448,6 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
     const localRoot = path.join(sharedRoot, type);
     const repoRoot = repoTypeDir(config.repoPath, type);
     await collectForAgentType({
-      sourceLabel: SHARED_LABEL,
       backupsDir: config.backups.dir,
       backupsEnabled: config.backups.enabled,
       dryRun: Boolean(opts.dryRun),
@@ -414,6 +457,8 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
       localRoot,
       policy,
       repoRoot,
+      selectAll: Boolean(opts.selectAll),
+      sourceLabel: SHARED_LABEL,
       timestamp,
       type,
     });

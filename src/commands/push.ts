@@ -8,8 +8,8 @@ import {
   gitOrThrow,
   hasOriginRemote,
 } from "../git/git.js";
-import { formatTimestampForCommit } from "../util/time.js";
 import { VibetoolsError } from "../util/errors.js";
+import { formatTimestampForCommit } from "../util/time.js";
 import { ensureRepoLooksInitialized, loadConfigOrThrow } from "./_shared.js";
 import { runCollect } from "./collect.js";
 
