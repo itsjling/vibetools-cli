@@ -27,7 +27,7 @@ afterEach(async () => {
 describe("prompt abort handling", () => {
   it("install aborts when conflict prompt is cancelled", async () => {
     // Set up mock responses BEFORE importing and calling runInit
-    // runInit needs: promptRemoteChoice (choice: "new"), promptRemoteUrl, promptBranchName
+    // RunInit needs: promptRemoteChoice (choice: "new"), promptRemoteUrl, promptBranchName
     promptsMock
       .mockResolvedValueOnce({ choice: "new" })
       .mockResolvedValueOnce({ remote: "https://github.com/test/repo.git" })

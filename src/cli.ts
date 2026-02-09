@@ -6,6 +6,7 @@ import { runConfigure } from "./commands/configure.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runInit } from "./commands/init.js";
 import { runInstall } from "./commands/install.js";
+import { runList } from "./commands/list.js";
 import { runPull } from "./commands/pull.js";
 import { runPush } from "./commands/push.js";
 import { runStatus } from "./commands/status.js";
@@ -42,6 +43,16 @@ program
   )
   .option("--type <type>", "Filter to a single type (skills|commands)")
   .action(async (opts) => runStatus(opts));
+
+program
+  .command("list")
+  .description("List skills, commands, or templates in the repo.")
+  .option(
+    "--type <type>",
+    "Filter to a single type (skills|commands|templates|all)"
+  )
+  .option("--json", "Output machine-readable JSON")
+  .action(async (opts) => runList(opts));
 
 program
   .command("install")
