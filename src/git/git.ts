@@ -110,3 +110,76 @@ export async function getAheadBehind(
   }
   return { ahead, behind };
 }
+
+export interface FileChange {
+  path: string;
+  status: "added" | "deleted" | "updated";
+}
+
+export async function getDiffSummary(
+  repoPath: string,
+  ref?: string
+): Promise<FileChange[]> {
+  const args = ref ? ["diff", "--name-status", ref] : ["diff", "--name-status", "HEAD~1", "HEAD"];
+  const result = await git(repoPath, args);
+  if (result.code !== EXIT_SUCCESS) {
+    return [];
+  }
+
+  const changes: FileChange[] = [];
+  const lines = result.stdout.trim().split("\n");
+
+  for (const line of lines) {
+    if (!line) continue;
+    const parts = line.split("\t");
+    if (parts.length < 2) continue;
+
+    const status = parts[0];
+    const filePath = parts[1];
+
+    let changeStatus: "added" | "deleted" | "updated";
+    if (status === "A") {
+      changeStatus = "added";
+    } else if (status === "D") {
+      changeStatus = "deleted";
+    } else {
+      changeStatus = "updated";
+    }
+
+    changes.push({ path: filePath, status: changeStatus });
+  }
+
+  return changes;
+}
+
+export async function getStagedChanges(repoPath: string): Promise<FileChange[]> {
+  const result = await git(repoPath, ["diff", "--cached", "--name-status"]);
+  if (result.code !== EXIT_SUCCESS) {
+    return [];
+  }
+
+  const changes: FileChange[] = [];
+  const lines = result.stdout.trim().split("\n");
+
+  for (const line of lines) {
+    if (!line) continue;
+    const parts = line.split("\t");
+    if (parts.length < 2) continue;
+
+    const status = parts[0];
+    const filePath = parts[1];
+
+    let changeStatus: "added" | "deleted" | "updated";
+    if (status === "A") {
+      changeStatus = "added";
+    } else if (status === "D") {
+      changeStatus = "deleted";
+    } else {
+      changeStatus = "updated";
+    }
+
+    changes.push({ path: filePath, status: changeStatus });
+  }
+
+  return changes;
+}

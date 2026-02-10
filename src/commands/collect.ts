@@ -71,13 +71,21 @@ interface CollectibleEntry {
   type: VibetoolsArtifactType;
 }
 
+function getSharedAgentsDir(): string {
+  const override = process.env.VIBETOOLS_HOME;
+  if (override) {
+    return path.join(override, ".agents");
+  }
+  return path.join(os.homedir(), ".agents");
+}
+
 async function getAvailableSources(
   config: Awaited<ReturnType<typeof loadConfigOrThrow>>["config"]
 ): Promise<SourceOption[]> {
   const sources: SourceOption[] = [];
 
   // Add shared folder
-  const sharedPath = path.join(os.homedir(), ".agents");
+  const sharedPath = getSharedAgentsDir();
   sources.push({
     enabled: await pathExists(sharedPath),
     label: `Shared folder (~/.agents)`,
@@ -456,7 +464,7 @@ async function gatherEntriesFromSource(
     let includeFilters = SHARED_FILTERS;
 
     if (source === "shared") {
-      localRoot = path.join(os.homedir(), ".agents", type);
+      localRoot = path.join(getSharedAgentsDir(), type);
     } else {
       localRoot = agentTypeDir(config, source, type);
       const agentCfg = config.agents[source];

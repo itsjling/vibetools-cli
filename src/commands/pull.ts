@@ -5,8 +5,10 @@ import prompts from "prompts";
 
 import {
   ensureGitAvailable,
+  getDiffSummary,
   getGitStatusPorcelain,
   gitOrThrow,
+  type FileChange,
 } from "../git/git.js";
 import {
   backupEntry,
@@ -30,6 +32,44 @@ const INDEX_FIRST = 0;
 
 function promptOnCancel(): never {
   throw new VibetoolsError("Aborted.", { exitCode: 1 });
+}
+
+function displayChangesSummary(changes: FileChange[]): void {
+  if (changes.length === 0) {
+    console.log(chalk.dim("No new changes to sync."));
+    return;
+  }
+
+  console.log(chalk.cyan("\nPulled changes summary:"));
+  console.log(chalk.gray("─".repeat(50)));
+
+  const added = changes.filter((c) => c.status === "added");
+  const updated = changes.filter((c) => c.status === "updated");
+  const deleted = changes.filter((c) => c.status === "deleted");
+
+  if (added.length > 0) {
+    console.log(chalk.green(`\n  Added (${added.length}):`));
+    for (const change of added) {
+      console.log(chalk.green(`    + ${change.path}`));
+    }
+  }
+
+  if (updated.length > 0) {
+    console.log(chalk.yellow(`\n  Updated (${updated.length}):`));
+    for (const change of updated) {
+      console.log(chalk.yellow(`    ~ ${change.path}`));
+    }
+  }
+
+  if (deleted.length > 0) {
+    console.log(chalk.red(`\n  Deleted (${deleted.length}):`));
+    for (const change of deleted) {
+      console.log(chalk.red(`    - ${change.path}`));
+    }
+  }
+
+  console.log(chalk.gray("─".repeat(50)));
+  console.log(chalk.cyan(`\nTotal: ${changes.length} file(s) pulled\n`));
 }
 
 function resolveConflictPolicy(
@@ -155,8 +195,15 @@ export async function runPull(opts: PullOptions): Promise<void> {
 
   const useRebase = opts.rebase !== false;
   const args = ["pull", ...(useRebase ? ["--rebase"] : ["--no-rebase"])];
+
+  // Get the changes that will be pulled
+  const pulledChanges = opts.dryRun ? [] : await getDiffSummary(config.repoPath, "HEAD...@{u}");
+
   await gitOrThrow(config.repoPath, args, "git pull failed.");
   console.log(chalk.green("Pulled latest changes."));
+
+  // Display summary of what was pulled
+  displayChangesSummary(pulledChanges);
 
   // Determine conflict policy based on --conflict-resolution flag
   const conflictPolicy = resolveConflictPolicy(opts.conflictResolution);

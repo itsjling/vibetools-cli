@@ -4,6 +4,8 @@ import prompts from "prompts";
 import {
   ensureGitAvailable,
   getGitStatusPorcelain,
+  getStagedChanges,
+  type FileChange,
   git,
   gitOrThrow,
   hasOriginRemote,
@@ -57,6 +59,43 @@ async function commitIfNeeded(args: {
   console.log(chalk.green("Committed changes."));
 }
 
+function displayChangesSummary(changes: FileChange[]): void {
+  if (changes.length === 0) {
+    return;
+  }
+
+  console.log(chalk.cyan("\nChanges summary:"));
+  console.log(chalk.gray("─".repeat(50)));
+
+  const added = changes.filter((c) => c.status === "added");
+  const updated = changes.filter((c) => c.status === "updated");
+  const deleted = changes.filter((c) => c.status === "deleted");
+
+  if (added.length > 0) {
+    console.log(chalk.green(`\n  Added (${added.length}):`));
+    for (const change of added) {
+      console.log(chalk.green(`    + ${change.path}`));
+    }
+  }
+
+  if (updated.length > 0) {
+    console.log(chalk.yellow(`\n  Updated (${updated.length}):`));
+    for (const change of updated) {
+      console.log(chalk.yellow(`    ~ ${change.path}`));
+    }
+  }
+
+  if (deleted.length > 0) {
+    console.log(chalk.red(`\n  Deleted (${deleted.length}):`));
+    for (const change of deleted) {
+      console.log(chalk.red(`    - ${change.path}`));
+    }
+  }
+
+  console.log(chalk.gray("─".repeat(50)));
+  console.log(chalk.cyan(`\nTotal: ${changes.length} file(s) changed\n`));
+}
+
 async function pushToOrigin(repoPath: string): Promise<void> {
   if (!(await hasOriginRemote(repoPath))) {
     console.log(
@@ -67,6 +106,9 @@ async function pushToOrigin(repoPath: string): Promise<void> {
     return;
   }
 
+  // Get changes before push
+  const changes = await getStagedChanges(repoPath);
+
   const pushResult = await git(repoPath, ["push"]);
   if (pushResult.code !== EXIT_SUCCESS) {
     throw new Error(
@@ -74,6 +116,9 @@ async function pushToOrigin(repoPath: string): Promise<void> {
     );
   }
   console.log(chalk.green("Pushed to remote."));
+
+  // Display summary of what was pushed
+  displayChangesSummary(changes);
 }
 
 export async function runPush(opts: PushOptions): Promise<void> {
