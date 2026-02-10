@@ -120,7 +120,9 @@ export async function getDiffSummary(
   repoPath: string,
   ref?: string
 ): Promise<FileChange[]> {
-  const args = ref ? ["diff", "--name-status", ref] : ["diff", "--name-status", "HEAD~1", "HEAD"];
+  const args = ref
+    ? ["diff", "--name-status", ref]
+    : ["diff", "--name-status", "HEAD~1", "HEAD"];
   const result = await git(repoPath, args);
   if (result.code !== EXIT_SUCCESS) {
     return [];
@@ -130,9 +132,9 @@ export async function getDiffSummary(
   const lines = result.stdout.trim().split("\n");
 
   for (const line of lines) {
-    if (!line) continue;
+    if (!line) {continue;}
     const parts = line.split("\t");
-    if (parts.length < 2) continue;
+    if (parts.length < 2) {continue;}
 
     const status = parts[0];
     const filePath = parts[1];
@@ -152,7 +154,9 @@ export async function getDiffSummary(
   return changes;
 }
 
-export async function getStagedChanges(repoPath: string): Promise<FileChange[]> {
+export async function getStagedChanges(
+  repoPath: string
+): Promise<FileChange[]> {
   const result = await git(repoPath, ["diff", "--cached", "--name-status"]);
   if (result.code !== EXIT_SUCCESS) {
     return [];
@@ -162,9 +166,9 @@ export async function getStagedChanges(repoPath: string): Promise<FileChange[]> 
   const lines = result.stdout.trim().split("\n");
 
   for (const line of lines) {
-    if (!line) continue;
+    if (!line) {continue;}
     const parts = line.split("\t");
-    if (parts.length < 2) continue;
+    if (parts.length < 2) {continue;}
 
     const status = parts[0];
     const filePath = parts[1];

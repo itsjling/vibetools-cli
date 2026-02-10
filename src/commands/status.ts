@@ -31,11 +31,11 @@ interface StatusOptions {
 }
 
 type ItemStatus =
-  | { kind: "missing" }
+  | { kind: "remote_only" }
   | { kind: "ok_symlink" }
   | { kind: "broken_symlink" }
   | { kind: "ok_copy" }
-  | { kind: "diff_copy"; repo: string; local: string };
+  | { kind: "diverged"; repo: string; local: string };
 
 interface TypeStatus {
   type: VibetoolsArtifactType;
@@ -72,7 +72,7 @@ function hashSummaryLabel(summary: HashSummary): string {
 
 async function getItemStatus(src: string, dest: string): Promise<ItemStatus> {
   if (!(await pathExists(dest))) {
-    return { kind: "missing" };
+    return { kind: "remote_only" };
   }
   if (await isSymlink(dest)) {
     const ok = await sameRealpath(dest, src);
@@ -87,7 +87,7 @@ async function getItemStatus(src: string, dest: string): Promise<ItemStatus> {
     return { kind: "ok_copy" };
   }
   return {
-    kind: "diff_copy",
+    kind: "diverged",
     local: hashSummaryLabel(localHash),
     repo: hashSummaryLabel(repoHash),
   };
@@ -135,7 +135,7 @@ async function getTypeStatus(args: {
   );
   if (!localRoot) {
     for (const name of repoEntries) {
-      entries[name] = { kind: "missing" };
+      entries[name] = { kind: "remote_only" };
     }
     return { entries, localOnly: [], localRoot, repoRoot, type: args.type };
   }
@@ -213,8 +213,8 @@ function kindCounts(
 ): Record<ItemStatus["kind"], number> {
   const counts: Record<ItemStatus["kind"], number> = {
     broken_symlink: 0,
-    diff_copy: 0,
-    missing: 0,
+    diverged: 0,
+    remote_only: 0,
     ok_copy: 0,
     ok_symlink: 0,
   };
@@ -239,8 +239,9 @@ function renderHuman(
     );
     for (const t of agent.types) {
       const counts = kindCounts(t.entries);
+      const orange = chalk.hex("#FFA500");
       console.log(
-        `  ${t.type}: missing ${counts.missing}, ok_symlink ${counts.ok_symlink}, broken_symlink ${counts.broken_symlink}, ok_copy ${counts.ok_copy}, diff_copy ${counts.diff_copy}, local_only ${t.localOnly.length}`
+        `  ${t.type}: ok_symlink ${chalk.green(counts.ok_symlink)}, ok_copy ${chalk.green(counts.ok_copy)}, diverged ${orange(counts.diverged)}, broken_symlink ${chalk.red(counts.broken_symlink)}, remote_only ${chalk.yellow(counts.remote_only)}, local_only ${chalk.cyan(t.localOnly.length)}`
       );
       if (t.localRoot) {
         console.log(chalk.dim(`    local: ${t.localRoot}`));

@@ -197,7 +197,9 @@ export async function runPull(opts: PullOptions): Promise<void> {
   const args = ["pull", ...(useRebase ? ["--rebase"] : ["--no-rebase"])];
 
   // Get the changes that will be pulled
-  const pulledChanges = opts.dryRun ? [] : await getDiffSummary(config.repoPath, "HEAD...@{u}");
+  const pulledChanges = opts.dryRun
+    ? []
+    : await getDiffSummary(config.repoPath, "HEAD...@{u}");
 
   await gitOrThrow(config.repoPath, args, "git pull failed.");
   console.log(chalk.green("Pulled latest changes."));

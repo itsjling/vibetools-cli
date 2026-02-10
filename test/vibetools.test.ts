@@ -846,14 +846,14 @@ describe("vibetools", () => {
       // Mock all the configure prompts
       promptsMock
         .mockResolvedValueOnce({
+          conflictPolicy: "prompt",
           installMode: "symlink",
           symlinkFallback: "copy",
-          conflictPolicy: "prompt",
         })
         .mockResolvedValueOnce({ agents: ["codex"] })
         .mockResolvedValueOnce({
-          skills: skillsDir,
           commands: commandsDir,
+          skills: skillsDir,
         })
         .mockResolvedValueOnce({ create: true }) // Create skills directory
         .mockResolvedValueOnce({ create: true }) // Create commands directory
