@@ -31,7 +31,14 @@ declare module "prompts" {
     validate?: (value: unknown) => true | string;
   }
 
+  export interface PromptsOptions {
+    onCancel?: () => void;
+  }
+
   export default function prompts<
     Answers extends Record<string, unknown> = Record<string, unknown>,
-  >(questions: PromptObject | PromptObject[]): Promise<Answers>;
+  >(
+    questions: PromptObject | PromptObject[],
+    options?: PromptsOptions
+  ): Promise<Answers>;
 }

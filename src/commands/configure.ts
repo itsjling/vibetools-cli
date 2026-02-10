@@ -14,12 +14,17 @@ import {
   type SymlinkFallback,
   type VibetoolsConfig,
 } from "../config/types.js";
+import { VibetoolsError } from "../util/errors.js";
 import { ensureRepoLooksInitialized } from "./_shared.js";
 
 const INDEX_FIRST = 0;
 const INDEX_SECOND = 1;
 const INDEX_THIRD = 2;
 const EMPTY_LENGTH = 0;
+
+function promptOnCancel(): never {
+  throw new VibetoolsError("Aborted.", { exitCode: 1 });
+}
 
 function expandUserPath(input: string): string {
   if (input === "~") {
@@ -44,12 +49,15 @@ async function ensureDirInteractive(dirPath: string): Promise<void> {
   if (await pathExists(dirPath)) {
     return;
   }
-  const res = await prompts<{ create: boolean }>({
-    initial: true,
-    message: `Directory does not exist: ${dirPath}\nCreate it?`,
-    name: "create",
-    type: "confirm",
-  });
+  const res = await prompts<{ create: boolean }>(
+    {
+      initial: true,
+      message: `Directory does not exist: ${dirPath}\nCreate it?`,
+      name: "create",
+      type: "confirm",
+    },
+    { onCancel: promptOnCancel }
+  );
   if (!res.create) {
     throw new Error(`Aborted (missing directory ${dirPath}).`);
   }
@@ -70,20 +78,23 @@ async function configureFilters(
   type: "skills" | "commands"
 ): Promise<void> {
   const current = config.agents[agentId].filters[type];
-  const res = await prompts<{ include: string; exclude: string }>([
-    {
-      initial: current.include.join(","),
-      message: `${agentId} ${type} include globs (comma-separated)`,
-      name: "include",
-      type: "text",
-    },
-    {
-      initial: current.exclude.join(","),
-      message: `${agentId} ${type} exclude globs (comma-separated)`,
-      name: "exclude",
-      type: "text",
-    },
-  ]);
+  const res = await prompts<{ include: string; exclude: string }>(
+    [
+      {
+        initial: current.include.join(","),
+        message: `${agentId} ${type} include globs (comma-separated)`,
+        name: "include",
+        type: "text",
+      },
+      {
+        initial: current.exclude.join(","),
+        message: `${agentId} ${type} exclude globs (comma-separated)`,
+        name: "exclude",
+        type: "text",
+      },
+    ],
+    { onCancel: promptOnCancel }
+  );
   config.agents[agentId].filters[type] = {
     exclude: String(res.exclude ?? "")
       .split(",")
@@ -126,49 +137,52 @@ async function promptSettings(config: VibetoolsConfig): Promise<{
     installMode?: InstallMode;
     symlinkFallback?: SymlinkFallback;
     conflictPolicy?: ConflictPolicy;
-  }>([
-    {
-      choices: [
-        {
-          title: "Symlink (recommended)",
-          value: "symlink" satisfies InstallMode,
-        },
-        { title: "Copy", value: "copy" satisfies InstallMode },
-      ],
-      initial: getInstallModeInitial(config),
-      message: "Default install mode",
-      name: "installMode",
-      type: "select",
-    },
-    {
-      choices: [
-        {
-          title: "Fallback to copy (recommended)",
-          value: "copy" satisfies SymlinkFallback,
-        },
-        { title: "Prompt", value: "prompt" satisfies SymlinkFallback },
-        { title: "Error", value: "error" satisfies SymlinkFallback },
-      ],
-      initial: getSymlinkFallbackInitial(config),
-      message: "If symlink fails, then…",
-      name: "symlinkFallback",
-      type: (prev: unknown) => (prev === "symlink" ? "select" : null),
-    },
-    {
-      choices: [
-        {
-          title: "Prompt (recommended)",
-          value: "prompt" satisfies ConflictPolicy,
-        },
-        { title: "Repo wins", value: "repoWins" satisfies ConflictPolicy },
-        { title: "Local wins", value: "localWins" satisfies ConflictPolicy },
-      ],
-      initial: getConflictPolicyInitial(config),
-      message: "Default conflict policy",
-      name: "conflictPolicy",
-      type: "select",
-    },
-  ]);
+  }>(
+    [
+      {
+        choices: [
+          {
+            title: "Symlink (recommended)",
+            value: "symlink" satisfies InstallMode,
+          },
+          { title: "Copy", value: "copy" satisfies InstallMode },
+        ],
+        initial: getInstallModeInitial(config),
+        message: "Default install mode",
+        name: "installMode",
+        type: "select",
+      },
+      {
+        choices: [
+          {
+            title: "Fallback to copy (recommended)",
+            value: "copy" satisfies SymlinkFallback,
+          },
+          { title: "Prompt", value: "prompt" satisfies SymlinkFallback },
+          { title: "Error", value: "error" satisfies SymlinkFallback },
+        ],
+        initial: getSymlinkFallbackInitial(config),
+        message: "If symlink fails, then…",
+        name: "symlinkFallback",
+        type: (prev: unknown) => (prev === "symlink" ? "select" : null),
+      },
+      {
+        choices: [
+          {
+            title: "Prompt (recommended)",
+            value: "prompt" satisfies ConflictPolicy,
+          },
+          { title: "Repo wins", value: "repoWins" satisfies ConflictPolicy },
+          { title: "Local wins", value: "localWins" satisfies ConflictPolicy },
+        ],
+        initial: getConflictPolicyInitial(config),
+        message: "Default conflict policy",
+        name: "conflictPolicy",
+        type: "select",
+      },
+    ],
+    { onCancel: promptOnCancel }
+  );
 }
 
 async function promptEnabledAgents(
@@ -177,17 +191,20 @@ async function promptEnabledAgents(
   const enabledDefault = new Set(
     AGENT_IDS.filter((id) => config.agents[id].enabled)
   );
-  const enabled = await prompts<{ agents?: AgentId[] }>({
-    choices: adapters.map((a) => ({
-      selected: enabledDefault.has(a.id),
-      title: a.displayName,
-      value: a.id,
-    })),
-    hint: "- Space to select. Enter to submit.",
-    message: "Enable which agents on this machine?",
-    name: "agents",
-    type: "multiselect",
-  });
+  const enabled = await prompts<{ agents?: AgentId[] }>(
+    {
+      choices: adapters.map((a) => ({
+        selected: enabledDefault.has(a.id),
+        title: a.displayName,
+        value: a.id,
+      })),
+      hint: "- Space to select. Enter to submit.",
+      message: "Enable which agents on this machine?",
+      name: "agents",
+      type: "multiselect",
+    },
+    { onCancel: promptOnCancel }
+  );
   return enabled.agents ?? [];
 }
 
@@ -195,24 +212,27 @@ async function promptAgentDirs(args: {
   agentName: string;
   defaults: { skills: string; commands: string };
 }): Promise<{ skills: string; commands: string }> {
-  return await prompts<{ skills: string; commands: string }>([
-    {
-      initial: args.defaults.skills,
-      message: `${args.agentName} skills directory`,
-      name: "skills",
-      type: "text",
-      validate: (v: unknown) =>
-        String(v).trim().length > EMPTY_LENGTH ? true : "Required",
-    },
-    {
-      initial: args.defaults.commands,
-      message: `${args.agentName} commands directory`,
-      name: "commands",
-      type: "text",
-      validate: (v: unknown) =>
-        String(v).trim().length > EMPTY_LENGTH ? true : "Required",
-    },
-  ]);
+  return await prompts<{ skills: string; commands: string }>(
+    [
+      {
+        initial: args.defaults.skills,
+        message: `${args.agentName} skills directory`,
+        name: "skills",
+        type: "text",
+        validate: (v: unknown) =>
+          String(v).trim().length > EMPTY_LENGTH ? true : "Required",
+      },
+      {
+        initial: args.defaults.commands,
+        message: `${args.agentName} commands directory`,
+        name: "commands",
+        type: "text",
+        validate: (v: unknown) =>
+          String(v).trim().length > EMPTY_LENGTH ? true : "Required",
+      },
+    ],
+    { onCancel: promptOnCancel }
+  );
 }
 
 async function maybeEditFiltersForAgent(
@@ -220,12 +240,15 @@ async function maybeEditFiltersForAgent(
   agentId: AgentId,
   agentName: string
 ): Promise<void> {
-  const filterToggle = await prompts<{ edit: boolean }>({
-    initial: false,
-    message: `Edit include/exclude globs for ${agentName}?`,
-    name: "edit",
-    type: "confirm",
-  });
+  const filterToggle = await prompts<{ edit: boolean }>(
+    {
+      initial: false,
+      message: `Edit include/exclude globs for ${agentName}?`,
+      name: "edit",
+      type: "confirm",
+    },
+    { onCancel: promptOnCancel }
+  );
   if (!filterToggle.edit) {
     return;
   }

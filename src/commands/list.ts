@@ -26,18 +26,25 @@ function isValidType(value: string): value is ListableType {
   return VALID_TYPES.includes(value as ListableType);
 }
 
+function promptOnCancel(): never {
+  throw new VibetoolsError("Aborted.", { exitCode: 1 });
+}
+
 async function promptForType(): Promise<ListableType> {
-  const response = await prompts<{ type: ListableType }>({
-    choices: [
-      { title: "Skills", value: "skills" },
-      { title: "Commands", value: "commands" },
-      { title: "Templates", value: "templates" },
-      { title: "All", value: "all" },
-    ],
-    message: "What would you like to list?",
-    name: "type",
-    type: "select",
-  });
+  const response = await prompts<{ type: ListableType }>(
+    {
+      choices: [
+        { title: "Skills", value: "skills" },
+        { title: "Commands", value: "commands" },
+        { title: "Templates", value: "templates" },
+        { title: "All", value: "all" },
+      ],
+      message: "What would you like to list?",
+      name: "type",
+      type: "select",
+    },
+    { onCancel: promptOnCancel }
+  );
 
   if (!response.type) {
     throw new VibetoolsError("Aborted.", { exitCode: 1 });

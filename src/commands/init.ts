@@ -16,6 +16,7 @@ import {
 } from "../repo/layout.js";
 import { VibetoolsError } from "../util/errors.js";
 import { ensureRepoLooksInitialized } from "./_shared.js";
+import { runInstall } from "./install.js";
 
 interface InitOptions {
   repo?: string;
@@ -23,6 +24,7 @@ interface InitOptions {
   branch?: string;
 }
 
+type SetupChoice = "new" | "clone";
 type RemoteChoice = "existing" | "new";
 
 const INDEX_FIRST = 0;
@@ -126,7 +128,7 @@ async function confirmReclone(repoPath: string): Promise<boolean> {
   return Boolean(res.ok);
 }
 
-async function recloneRepo(repoPath: string, remoteUrl: string): Promise<void> {
+async function cloneRepo(repoPath: string, remoteUrl: string): Promise<void> {
   if (repoPath === "/" || repoPath === os.homedir()) {
     throw new VibetoolsError(`Refusing to delete ${repoPath}.`, {
       exitCode: 1,
@@ -160,6 +162,23 @@ async function setUpstreamConfig(
     ["config", `branch.${normalized}.merge`, `refs/heads/${normalized}`],
     "Failed to configure branch merge target."
   );
+}
+
+async function promptSetupChoice(): Promise<SetupChoice> {
+  const selection = await prompts<{ choice?: SetupChoice }>(
+    {
+      choices: [
+        { title: "Create new repository", value: "new" },
+        { title: "Clone existing repository", value: "clone" },
+      ],
+      initial: INDEX_FIRST,
+      message: "What would you like to do?",
+      name: "choice",
+      type: "select",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return selection.choice ?? "new";
 }
 
 async function promptRemoteChoice(): Promise<RemoteChoice> {
@@ -221,34 +240,23 @@ async function promptRemoteUrl(): Promise<string> {
   return String(res.remote ?? "");
 }
 
-export async function runInit(opts: InitOptions): Promise<void> {
-  await ensureGitAvailable();
-  await ensureVibetoolsHome();
+async function promptInstallAfterClone(): Promise<boolean> {
+  const res = await prompts<{ ok?: boolean }>(
+    {
+      initial: true,
+      message: "Install skills from the cloned repo into your agents?",
+      name: "ok",
+      type: "confirm",
+    },
+    { onCancel: promptOnCancel }
+  );
+  return Boolean(res.ok);
+}
 
-  const repoPath = path.resolve(opts.repo ?? getDefaultRepoPath());
-  const gitDir = path.join(repoPath, ".git");
-
-  const { config, configPath } = await loadConfig();
-  const nextConfig = config ?? createDefaultConfig();
-  nextConfig.repoPath = repoPath;
-  await saveConfig(nextConfig, configPath);
-
-  if (await pathExists(gitDir)) {
-    const choice = await promptRemoteChoice();
-    if (choice === "new") {
-      printNewRemoteInstructions();
-    }
-    const remoteUrl = opts.remote ?? (await promptRemoteUrl());
-    const ok = await confirmReclone(repoPath);
-    if (!ok) {
-      throw new VibetoolsError("Aborted.", { exitCode: 1 });
-    }
-    await recloneRepo(repoPath, remoteUrl);
-    await ensureRepoLooksInitialized(repoPath);
-    console.log(chalk.green(`Re-cloned vibetools repo at ${repoPath}`));
-    return;
-  }
-
+async function initializeNewRepo(
+  repoPath: string,
+  opts: InitOptions
+): Promise<void> {
   await fs.mkdir(repoAgentsSkillsDir(repoPath), { recursive: true });
   await fs.mkdir(repoAgentsCommandsDir(repoPath), { recursive: true });
   await fs.mkdir(repoTemplatesAgentsMdDir(repoPath), { recursive: true });
@@ -277,4 +285,70 @@ export async function runInit(opts: InitOptions): Promise<void> {
   }
 
   console.log(chalk.green(`Initialized vibetools repo at ${repoPath}`));
+}
+
+async function cloneExistingRepo(
+  repoPath: string,
+  remoteUrl: string,
+  _opts: InitOptions
+): Promise<void> {
+  await cloneRepo(repoPath, remoteUrl);
+  await ensureRepoLooksInitialized(repoPath);
+  console.log(chalk.green(`Cloned vibetools repo to ${repoPath}`));
+
+  const shouldInstall = await promptInstallAfterClone();
+  if (shouldInstall) {
+    console.log(chalk.cyan("Installing skills from cloned repo..."));
+    await runInstall({});
+  }
+}
+
+export async function runInit(opts: InitOptions): Promise<void> {
+  await ensureGitAvailable();
+  await ensureVibetoolsHome();
+
+  const repoPath = path.resolve(opts.repo ?? getDefaultRepoPath());
+  const gitDir = path.join(repoPath, ".git");
+
+  const { config, configPath } = await loadConfig();
+  const nextConfig = config ?? createDefaultConfig();
+  nextConfig.repoPath = repoPath;
+  await saveConfig(nextConfig, configPath);
+
+  if (await pathExists(gitDir)) {
+    const choice = await promptRemoteChoice();
+    if (choice === "new") {
+      printNewRemoteInstructions();
+    }
+    const remoteUrl = opts.remote ?? (await promptRemoteUrl());
+    const ok = await confirmReclone(repoPath);
+    if (!ok) {
+      throw new VibetoolsError("Aborted.", { exitCode: 1 });
+    }
+    await cloneRepo(repoPath, remoteUrl);
+    await ensureRepoLooksInitialized(repoPath);
+    console.log(chalk.green(`Re-cloned vibetools repo at ${repoPath}`));
+    return;
+  }
+
+  // Determine if creating new or cloning
+  let setupChoice: SetupChoice;
+  let remoteUrl: string | undefined;
+
+  if (opts.remote) {
+    // Non-interactive clone mode
+    setupChoice = "clone";
+    remoteUrl = opts.remote;
+  } else {
+    setupChoice = await promptSetupChoice();
+    if (setupChoice === "clone") {
+      remoteUrl = await promptRemoteUrl();
+    }
+  }
+
+  if (setupChoice === "clone" && remoteUrl) {
+    await cloneExistingRepo(repoPath, remoteUrl, opts);
+  } else {
+    await initializeNewRepo(repoPath, opts);
+  }
 }

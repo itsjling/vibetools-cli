@@ -34,7 +34,7 @@ import {
   repoTypeDir,
 } from "./_shared.js";
 
-interface InstallOptions {
+export interface InstallOptions {
   dryRun?: boolean;
   agent?: string;
   type?: string;
@@ -43,7 +43,23 @@ interface InstallOptions {
   force?: boolean;
 }
 
+export interface KeptLocalEntry {
+  agentId: AgentId;
+  type: VibetoolsArtifactType;
+  name: string;
+  localPath: string;
+  repoPath: string;
+}
+
+export interface InstallResult {
+  keptLocals: KeptLocalEntry[];
+}
+
 type ConflictDecision = "replace" | "skip" | "abort";
+
+function promptOnCancel(): never {
+  throw new VibetoolsError("Aborted.", { exitCode: 1 });
+}
 
 function resolvePolicy(
   optsPolicy: string | undefined,
@@ -91,17 +107,20 @@ async function decideConflict(args: {
     destStat.isFile();
 
   while (true) {
-    const res = await prompts<{ decision: ConflictDecision | "diff" }>({
-      choices: [
-        { title: "Replace local with repo version", value: "replace" },
-        { title: "Skip", value: "skip" },
-        ...(canDiff ? [{ title: "Show diff", value: "diff" }] : []),
-        { title: "Abort", value: "abort" },
-      ],
-      message: `Conflict: ${args.agentId} ${args.type} '${args.name}' already exists locally. What do you want to do?`,
-      name: "decision",
-      type: "select",
-    });
+    const res = await prompts<{ decision: ConflictDecision | "diff" }>(
+      {
+        choices: [
+          { title: "Replace local with repo version", value: "replace" },
+          { title: "Keep local version", value: "skip" },
+          ...(canDiff ? [{ title: "Show diff", value: "diff" }] : []),
+          { title: "Abort", value: "abort" },
+        ],
+        message: `Conflict: ${args.agentId} ${args.type} '${args.name}' already exists locally. What do you want to do?`,
+        name: "decision",
+        type: "select",
+      },
+      { onCancel: promptOnCancel }
+    );
 
     if (!res.decision) {
       return "abort";
@@ -191,15 +210,18 @@ async function installOne(args: {
       await copyEntry(args.src, args.dest);
       return { installed: true, modeUsed: "copy" };
     }
-    const res = await prompts<{ fallback: "copy" | "abort" }>({
-      choices: [
-        { title: "Fallback to copy", value: "copy" },
-        { title: "Abort", value: "abort" },
-      ],
-      message: `Failed to create symlink for ${args.dest}.`,
-      name: "fallback",
-      type: "select",
-    });
+    const res = await prompts<{ fallback: "copy" | "abort" }>(
+      {
+        choices: [
+          { title: "Fallback to copy", value: "copy" },
+          { title: "Abort", value: "abort" },
+        ],
+        message: `Failed to create symlink for ${args.dest}.`,
+        name: "fallback",
+        type: "select",
+      },
+      { onCancel: promptOnCancel }
+    );
     if (res.fallback === "copy") {
       await copyEntry(args.src, args.dest);
       return { installed: true, modeUsed: "copy" };
@@ -221,6 +243,7 @@ async function installEntry(args: {
   src: string;
   symlinkFallback: SymlinkFallback;
   type: VibetoolsArtifactType;
+  onKeepLocal?: (entry: KeptLocalEntry) => void;
 }): Promise<"ok" | "abort"> {
   if (await pathExists(args.dest)) {
     if (await isCorrectSymlink(args.dest, args.src)) {
@@ -240,6 +263,16 @@ async function installEntry(args: {
       type: args.type,
     });
     if (decision === "skip") {
+      // Track that we kept the local version
+      if (args.onKeepLocal) {
+        args.onKeepLocal({
+          agentId: args.agentId,
+          localPath: args.dest,
+          name: args.name,
+          repoPath: args.src,
+          type: args.type,
+        });
+      }
       return "ok";
     }
     if (decision === "abort") {
@@ -286,6 +319,7 @@ async function installForAgentType(args: {
   policy: ConflictPolicy;
   timestamp: string;
   type: VibetoolsArtifactType;
+  onKeepLocal?: (entry: KeptLocalEntry) => void;
 }): Promise<"ok" | "abort"> {
   const agentCfg = args.config.agents[args.agentId];
   const localRoot = agentTypeDir(args.config, args.agentId, args.type);
@@ -317,6 +351,7 @@ async function installForAgentType(args: {
       force: args.force,
       installMode: args.installMode,
       name,
+      onKeepLocal: args.onKeepLocal,
       policy: args.policy,
       src,
       symlinkFallback: args.config.symlinkFallback,
@@ -339,6 +374,7 @@ async function installForAgent(args: {
   policy: ConflictPolicy;
   timestamp: string;
   types: VibetoolsArtifactType[];
+  onKeepLocal?: (entry: KeptLocalEntry) => void;
 }): Promise<"ok" | "abort"> {
   const agentCfg = args.config.agents[args.agentId];
   if (!agentCfg.enabled) {
@@ -351,6 +387,7 @@ async function installForAgent(args: {
       dryRun: args.dryRun,
       force: args.force,
       installMode: args.installMode,
+      onKeepLocal: args.onKeepLocal,
       policy: args.policy,
       timestamp: args.timestamp,
       type,
@@ -362,7 +399,7 @@ async function installForAgent(args: {
   return "ok";
 }
 
-export async function runInstall(opts: InstallOptions): Promise<void> {
+export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
   const { config } = await loadConfigOrThrow();
   await ensureRepoLooksInitialized(config.repoPath);
 
@@ -373,6 +410,12 @@ export async function runInstall(opts: InstallOptions): Promise<void> {
   const installMode = resolveInstallMode(opts.mode, config.installMode);
   const timestamp = formatTimestampForPath();
 
+  const keptLocals: KeptLocalEntry[] = [];
+
+  const onKeepLocal = (entry: KeptLocalEntry): void => {
+    keptLocals.push(entry);
+  };
+
   for (const agentId of agents) {
     const result = await installForAgent({
       agentId,
@@ -380,6 +423,7 @@ export async function runInstall(opts: InstallOptions): Promise<void> {
       dryRun: Boolean(opts.dryRun),
       force: Boolean(opts.force),
       installMode,
+      onKeepLocal,
       policy,
       timestamp,
       types,
@@ -390,4 +434,6 @@ export async function runInstall(opts: InstallOptions): Promise<void> {
       });
     }
   }
+
+  return { keptLocals };
 }

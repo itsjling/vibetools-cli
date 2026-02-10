@@ -21,9 +21,11 @@ program
 
 program
   .command("init")
-  .description("Initialize the vibetools git repo and directory structure.")
+  .description(
+    "Initialize the vibetools git repo and directory structure, or clone an existing repo."
+  )
   .option("--repo <path>", "Repo path (default: ~/.vibetools/repo)")
-  .option("--remote <url>", "Optional git remote URL (origin)")
+  .option("--remote <url>", "Remote URL to clone from")
   .option("--branch <name>", "Default branch name (default: main)")
   .action(async (opts) => runInit(opts));
 
@@ -68,7 +70,9 @@ program
   .option("--policy <policy>", "Conflict policy (prompt|repoWins|localWins)")
   .option("--mode <mode>", "Install mode (symlink|copy)")
   .option("--force", "Do not confirm per conflict (still backs up)")
-  .action(async (opts) => runInstall(opts));
+  .action(async (opts) => {
+    await runInstall(opts);
+  });
 
 program
   .command("collect")
@@ -86,6 +90,11 @@ program
   )
   .option("--force", "Do not confirm per conflict (still backs up)")
   .option("--select-all", "Select all skills/commands without prompting")
+  .option("--push", "Push changes to remote after collecting")
+  .option(
+    "--sources <list>",
+    "Comma-separated list of sources to collect from (shared,codex,cursor,etc.)"
+  )
   .action(async (opts) => runCollect(opts));
 
 program
@@ -94,6 +103,10 @@ program
   .option("--rebase", "Use git pull --rebase (default)")
   .option("--no-rebase", "Use git pull --no-rebase")
   .option("--dry-run", "Plan install without writing")
+  .option(
+    "--conflict-resolution <mode>",
+    "Conflict resolution mode (local|remote|prompt)"
+  )
   .action(async (opts) => runPull(opts));
 
 program
