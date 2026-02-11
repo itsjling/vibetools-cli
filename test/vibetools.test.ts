@@ -886,4 +886,47 @@ describe("vibetools", () => {
       await expect(runConfigure()).rejects.toThrow(/Aborted/);
     });
   });
+
+  describe("repo command", () => {
+    async function setupRepoWithoutRemote(): Promise<string> {
+      // Initialize a repo without going through the init prompts
+      const repoPath = path.join(tempHome, "repo-no-remote");
+      await fs.mkdir(repoPath, { recursive: true });
+
+      // Create the required directory structure
+      const { repoAgentsSkillsDir, repoAgentsCommandsDir } =
+        await import("../src/repo/layout.js");
+      await fs.mkdir(repoAgentsSkillsDir(repoPath), { recursive: true });
+      await fs.mkdir(repoAgentsCommandsDir(repoPath), { recursive: true });
+
+      // Initialize git repo but don't add remote
+      const { git } = await import("../src/git/git.js");
+      await git(repoPath, ["init"]);
+
+      // Update config to use this repo
+      const { config, configPath } = await loadConfig();
+      config.repoPath = repoPath;
+      await saveConfig(config, configPath);
+
+      return repoPath;
+    }
+
+    it("throws error when no remote is configured", async () => {
+      await setupRepoWithoutRemote();
+
+      const { runRepo } = await import("../src/commands/repo.js");
+      await expect(runRepo({})).rejects.toThrow(
+        /No remote named "origin" is configured/
+      );
+    });
+
+    it("accepts custom remote name", async () => {
+      await setupRepoWithoutRemote();
+
+      const { runRepo } = await import("../src/commands/repo.js");
+      await expect(runRepo({ remote: "upstream" })).rejects.toThrow(
+        /No remote named "upstream" is configured/
+      );
+    });
+  });
 });

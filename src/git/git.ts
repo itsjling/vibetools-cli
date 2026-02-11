@@ -132,9 +132,13 @@ export async function getDiffSummary(
   const lines = result.stdout.trim().split("\n");
 
   for (const line of lines) {
-    if (!line) {continue;}
+    if (!line) {
+      continue;
+    }
     const parts = line.split("\t");
-    if (parts.length < 2) {continue;}
+    if (parts.length < 2) {
+      continue;
+    }
 
     const status = parts[0];
     const filePath = parts[1];
@@ -166,9 +170,13 @@ export async function getStagedChanges(
   const lines = result.stdout.trim().split("\n");
 
   for (const line of lines) {
-    if (!line) {continue;}
+    if (!line) {
+      continue;
+    }
     const parts = line.split("\t");
-    if (parts.length < 2) {continue;}
+    if (parts.length < 2) {
+      continue;
+    }
 
     const status = parts[0];
     const filePath = parts[1];

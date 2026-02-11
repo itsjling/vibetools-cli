@@ -214,9 +214,9 @@ function kindCounts(
   const counts: Record<ItemStatus["kind"], number> = {
     broken_symlink: 0,
     diverged: 0,
-    remote_only: 0,
     ok_copy: 0,
     ok_symlink: 0,
+    remote_only: 0,
   };
   for (const v of Object.values(entries)) {
     counts[v.kind] += 1;

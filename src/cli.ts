@@ -9,6 +9,7 @@ import { runInstall } from "./commands/install.js";
 import { runList } from "./commands/list.js";
 import { runPull } from "./commands/pull.js";
 import { runPush } from "./commands/push.js";
+import { runRepo } from "./commands/repo.js";
 import { runStatus } from "./commands/status.js";
 import { VibetoolsError } from "./util/errors.js";
 
@@ -122,6 +123,12 @@ program
   .command("doctor")
   .description("Check environment, repo, and config for issues.")
   .action(async () => runDoctor());
+
+program
+  .command("repo")
+  .description("Open the configured remote repo in the browser.")
+  .option("--remote <name>", "Remote name to open (default: origin)")
+  .action(async (opts) => runRepo(opts));
 
 async function main(): Promise<void> {
   await program.parseAsync(process.argv);
