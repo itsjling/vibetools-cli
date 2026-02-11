@@ -10,6 +10,7 @@ import type {
   VibetoolsArtifactType,
 } from "../config/types.js";
 
+import { VIBETOOLS_ARTIFACT_TYPES } from "../config/types.js";
 import { diffFiles } from "../sync/diff.js";
 import { applyFilters } from "../sync/filters.js";
 import {
@@ -129,6 +130,31 @@ async function promptForSources(
       })),
       hint: "- Space to toggle, A to toggle all, Enter to confirm",
       message: "Select sources to collect from",
+      name: "selected",
+      type: "multiselect",
+    },
+    { onCancel: promptOnCancel }
+  );
+
+  return res.selected ?? [];
+}
+
+async function promptForTypes(
+  selectAll: boolean
+): Promise<VibetoolsArtifactType[]> {
+  if (selectAll) {
+    return [...VIBETOOLS_ARTIFACT_TYPES];
+  }
+
+  const res = await prompts<{ selected: VibetoolsArtifactType[] }>(
+    {
+      choices: VIBETOOLS_ARTIFACT_TYPES.map((t) => ({
+        selected: true,
+        title: t,
+        value: t,
+      })),
+      hint: "- Space to toggle, A to toggle all, Enter to confirm",
+      message: "What types do you want to collect?",
       name: "selected",
       type: "multiselect",
     },
@@ -514,7 +540,9 @@ export async function runCollect(opts: CollectOptions): Promise<void> {
   const { config } = await loadConfigOrThrow();
   await ensureRepoLooksInitialized(config.repoPath);
 
-  const types = parseTypeFilter(opts.type);
+  const types = opts.type
+    ? parseTypeFilter(opts.type)
+    : await promptForTypes(Boolean(opts.selectAll));
   const policy = resolvePolicy(opts.policy, config.conflictPolicy);
   const respectEnabled = !opts.agent;
 
