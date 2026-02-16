@@ -53,9 +53,13 @@ export interface KeptLocalEntry {
 
 export interface InstallResult {
   keptLocals: KeptLocalEntry[];
+  installed: number;
+  upToDate: number;
+  skipped: number;
 }
 
 type ConflictDecision = "replace" | "skip" | "abort";
+type EntryResult = "installed" | "up-to-date" | "skipped" | "abort";
 
 function promptOnCancel(): never {
   throw new VibetoolsError("Aborted.", { exitCode: 1 });
@@ -244,13 +248,13 @@ async function installEntry(args: {
   symlinkFallback: SymlinkFallback;
   type: VibetoolsArtifactType;
   onKeepLocal?: (entry: KeptLocalEntry) => void;
-}): Promise<"ok" | "abort"> {
+}): Promise<EntryResult> {
   if (await pathExists(args.dest)) {
     if (await isCorrectSymlink(args.dest, args.src)) {
-      return "ok";
+      return "up-to-date";
     }
     if (await isIdenticalCopy(args.src, args.dest)) {
-      return "ok";
+      return "up-to-date";
     }
 
     const decision = await decideReplacement({
@@ -263,7 +267,6 @@ async function installEntry(args: {
       type: args.type,
     });
     if (decision === "skip") {
-      // Track that we kept the local version
       if (args.onKeepLocal) {
         args.onKeepLocal({
           agentId: args.agentId,
@@ -273,7 +276,7 @@ async function installEntry(args: {
           type: args.type,
         });
       }
-      return "ok";
+      return "skipped";
     }
     if (decision === "abort") {
       return "abort";
@@ -299,7 +302,7 @@ async function installEntry(args: {
     console.log(
       `${args.agentId} ${args.type}: would install ${args.name} (${args.installMode})`
     );
-    return "ok";
+    return "installed";
   }
 
   console.log(
@@ -307,12 +310,19 @@ async function installEntry(args: {
       `${args.agentId} ${args.type}: installed ${args.name} (${result.modeUsed === "symlink" ? "symlink" : "copy"})`
     )
   );
-  return "ok";
+  return "installed";
+}
+
+interface InstallCounts {
+  installed: number;
+  upToDate: number;
+  skipped: number;
 }
 
 async function installForAgentType(args: {
   agentId: AgentId;
   config: Awaited<ReturnType<typeof loadConfigOrThrow>>["config"];
+  counts: InstallCounts;
   dryRun: boolean;
   force: boolean;
   installMode: InstallMode;
@@ -360,6 +370,13 @@ async function installForAgentType(args: {
     if (result === "abort") {
       return "abort";
     }
+    if (result === "installed") {
+      args.counts.installed++;
+    } else if (result === "up-to-date") {
+      args.counts.upToDate++;
+    } else if (result === "skipped") {
+      args.counts.skipped++;
+    }
   }
 
   return "ok";
@@ -368,6 +385,7 @@ async function installForAgentType(args: {
 async function installForAgent(args: {
   agentId: AgentId;
   config: Awaited<ReturnType<typeof loadConfigOrThrow>>["config"];
+  counts: InstallCounts;
   dryRun: boolean;
   force: boolean;
   installMode: InstallMode;
@@ -384,6 +402,7 @@ async function installForAgent(args: {
     const result = await installForAgentType({
       agentId: args.agentId,
       config: args.config,
+      counts: args.counts,
       dryRun: args.dryRun,
       force: args.force,
       installMode: args.installMode,
@@ -411,6 +430,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
   const timestamp = formatTimestampForPath();
 
   const keptLocals: KeptLocalEntry[] = [];
+  const counts: InstallCounts = { installed: 0, skipped: 0, upToDate: 0 };
 
   const onKeepLocal = (entry: KeptLocalEntry): void => {
     keptLocals.push(entry);
@@ -420,6 +440,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
     const result = await installForAgent({
       agentId,
       config,
+      counts,
       dryRun: Boolean(opts.dryRun),
       force: Boolean(opts.force),
       installMode,
@@ -435,5 +456,25 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
     }
   }
 
-  return { keptLocals };
+  if (counts.installed === 0 && counts.skipped === 0 && counts.upToDate > 0) {
+    console.log(
+      chalk.dim(
+        `${counts.upToDate} ${counts.upToDate === 1 ? "entry" : "entries"} up to date.`
+      )
+    );
+  } else if (counts.installed > 0 || counts.skipped > 0) {
+    const parts: string[] = [];
+    if (counts.installed > 0) {
+      parts.push(`${counts.installed} installed`);
+    }
+    if (counts.upToDate > 0) {
+      parts.push(`${counts.upToDate} up to date`);
+    }
+    if (counts.skipped > 0) {
+      parts.push(`${counts.skipped} skipped`);
+    }
+    console.log(chalk.dim(parts.join(", ")));
+  }
+
+  return { installed: counts.installed, keptLocals, skipped: counts.skipped, upToDate: counts.upToDate };
 }
